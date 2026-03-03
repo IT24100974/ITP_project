@@ -1,0 +1,276 @@
+/* Navbar Styles - Floating Liquid Glass on White Background */
+body {
+  background: white;
+  min-height: 100vh;
+  margin: 0;
+}
+
+.navbar {
+  position: sticky;
+  top: 20px;
+  z-index: 1000;
+  width: 75%;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.navbar-container {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50px;
+  padding: 12px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 
+    0 10px 30px rgba(0, 0, 0, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  }
+  100% {
+    transform: translateY(0px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.navbar-brand a {
+  color: #1a1a1a;
+  font-size: 22px;
+  font-weight: 600;
+  text-decoration: none;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #333333, #000000);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.navbar-brand a:hover {
+  text-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  transform: scale(1.02);
+}
+
+.navbar-menu {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.navbar-user {
+  font-size: 14px;
+  padding: 6px 18px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 30px;
+  color: #333333;
+  font-weight: 500;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+}
+
+.navbar-link {
+  color: #333333;
+  text-decoration: none;
+  padding: 8px 20px;
+  border-radius: 30px;
+  font-weight: 500;
+  font-size: 15px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.navbar-link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.05), transparent);
+  transition: left 0.5s ease;
+}
+
+.navbar-link:hover {
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+  color: #000000;
+}
+
+.navbar-link:hover::before {
+  left: 100%;
+}
+
+.navbar-link:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.navbar-button {
+  background: rgba(0, 0, 0, 0.05);
+  color: #333333;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  padding: 8px 24px;
+  border-radius: 30px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  backdrop-filter: blur(5px);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 0.5px;
+}
+
+.navbar-button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.1);
+  transform: translate(-50%, -50%);
+  transition: width 0.5s, height 0.5s;
+}
+
+.navbar-button:hover {
+  background: #333333;
+  color: white;
+  border-color: #333333;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.navbar-button:hover::before {
+  width: 200px;
+  height: 200px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.navbar-button:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Background glow effect for the entire navbar */
+.navbar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12.5%;
+  width: 75%;
+  height: 100%;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.03) 0%, transparent 70%);
+  filter: blur(20px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Active link state */
+.navbar-link.active {
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  color: #000000;
+  font-weight: 600;
+}
+
+/* Responsive Navbar */
+@media (max-width: 1024px) {
+  .navbar {
+    width: 85%;
+  }
+  
+  .navbar::before {
+    left: 7.5%;
+    width: 85%;
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar {
+    width: 90%;
+    top: 10px;
+    padding: 0 10px;
+  }
+  
+  .navbar::before {
+    left: 5%;
+    width: 90%;
+  }
+  
+  .navbar-container {
+    flex-direction: column;
+    gap: 15px;
+    padding: 15px 20px;
+    border-radius: 30px;
+  }
+
+  .navbar-menu {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .navbar-brand a {
+    font-size: 18px;
+  }
+
+  .navbar-link,
+  .navbar-button {
+    font-size: 13px;
+    padding: 6px 16px;
+  }
+  
+  .navbar-user {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar {
+    width: 95%;
+  }
+  
+  .navbar::before {
+    left: 2.5%;
+    width: 95%;
+  }
+  
+  .navbar-container {
+    padding: 12px 15px;
+    border-radius: 25px;
+  }
+  
+  .navbar-menu {
+    gap: 5px;
+  }
+  
+  .navbar-link,
+  .navbar-button {
+    font-size: 12px;
+    padding: 5px 12px;
+  }
+}
+
+/* Optional: Add a subtle pattern to the body */
