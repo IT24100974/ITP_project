@@ -1,64 +1,96 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
-const examSchema = new mongoose.Schema({
-  studentId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: [true, 'Student ID is required']
+const examSchema = new mongoose.Schema(
+  {
+    class: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Class',
+      required: [true, 'Class is required']
+    },
+    title: {
+      type: String,
+      required: [true, 'Exam title is required'],
+      trim: true
+    },
+    description: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    subject: {
+      type: String,
+      required: [true, 'Subject is required'],
+      trim: true
+    },
+    term: {
+      type: String,
+      enum: ['TERM_1', 'TERM_2', 'TERM_3', 'MID_TERM', 'FINAL', 'QUIZ', 'OTHER'],
+      default: 'OTHER'
+    },
+    paperType: {
+      type: String,
+      enum: ['MCQ', 'WRITTEN', 'MIXED'],
+      default: 'MIXED'
+    },
+    totalMarks: {
+      type: Number,
+      required: [true, 'Total marks is required'],
+      min: [1, 'Total marks must be at least 1']
+    },
+    passingMarks: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    duration: {
+      type: Number,
+      default: 60,
+      min: [1, 'Duration must be at least 1 minute']
+    },
+    scheduledDate: {
+      type: Date,
+      default: null
+    },
+    endDate: {
+      type: Date,
+      default: null
+    },
+    startTime: {
+      type: String,
+      default: ''
+    },
+    endTime: {
+      type: String,
+      default: ''
+    },
+    isPublished: {
+      type: Boolean,
+      default: false
+    },
+    resultsPublished: {
+      type: Boolean,
+      default: false
+    },
+    resultsPublishedAt: {
+      type: Date,
+      default: null
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    }
   },
-  subject: {
-    type: String,
-    required: [true, 'Subject is required'],
-    trim: true
-  },
-  marks: {
-    type: Number,
-    required: [true, 'Marks are required'],
-    min: 0
-  },
-  totalMarks: {
-    type: Number,
-    required: [true, 'Total marks are required'],
-    min: 0
-  },
-  percentage: {
-    type: Number
-  },
-  grade: {
-    type: String,
-    enum: ['A+', 'A', 'B', 'C', 'D', 'F']
-  },
-  examDate: {
-    type: Date,
-    default: Date.now
+  {
+    timestamps: true
   }
-}, {
-  timestamps: true
-});
+);
 
-// Calculate percentage and grade before saving
-examSchema.pre('save', function(next) {
-  // Calculate percentage
-  this.percentage = ((this.marks / this.totalMarks) * 100).toFixed(2);
-  
-  // Calculate grade
-  if (this.percentage >= 90) {
-    this.grade = 'A+';
-  } else if (this.percentage >= 80) {
-    this.grade = 'A';
-  } else if (this.percentage >= 70) {
-    this.grade = 'B';
-  } else if (this.percentage >= 60) {
-    this.grade = 'C';
-  } else if (this.percentage >= 50) {
-    this.grade = 'D';
-  } else {
-    this.grade = 'F';
-  }
-  
-  next();
-});
+examSchema.index({ class: 1, isActive: 1 });
+examSchema.index({ isPublished: 1, scheduledDate: -1 });
 
-const Exam = mongoose.model('Exam', examSchema);
-
-export default Exam;
+module.exports = mongoose.model('Exam', examSchema);
