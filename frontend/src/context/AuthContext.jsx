@@ -1,75 +1,73 @@
-import { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { toast } from 'react-toastify';
 
-const AuthContext = createContext();
-
-export const useAuth = () => useContext(AuthContext);
+export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Check local storage for user token on mount
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      setAuthToken(parsedUser.token);
+    // Check if user is logged in
+    const userInfo = localStorage.getItem('userInfo');
+    if (userInfo) {
+      setUser(JSON.parse(userInfo));
     }
     setLoading(false);
   }, []);
 
-  const setAuthToken = (token) => {
-    if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-      delete api.defaults.headers.common['Authorization'];
-    }
-  };
-
-  const login = async (username, password) => {
+  const login = async (email, password) => {
     try {
-      const res = await api.post('/auth/login', { username, password });
-      const userData = res.data.data;
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      setAuthToken(userData.token);
-      toast.success('Logged in successfully');
-      return { success: true, isFirstLogin: userData.isFirstLogin };
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed');
-      return { success: false, message: err.response?.data?.message };
+      const { data } = await api.post('/auth/login', { email, password });
+      localStorage.setItem('userInfo', JSON.stringify(data));
+      setUser(data);
+      
+      // Redirect based on role
+      if (data.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/student/dashboard');
+      }
+      
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Login failed'
+      };
     }
   };
 
   const logout = () => {
+    localStorage.removeItem('userInfo');
     setUser(null);
-    localStorage.removeItem('user');
-    setAuthToken(null);
-    toast.info('Logged out');
+    navigate('/login');
   };
 
-  // Called after first login forced reset
-  const updateFirstLoginStatus = () => {
-    if (user) {
-      const updatedUser = { ...user, isFirstLogin: false };
-      setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+  const register = async (userData) => {
+    try {
+      const { data } = await api.post('/auth/register', userData);
+      return { success: true, data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Registration failed'
+      };
     }
   };
 
-  const updateProfileImage = (imageUrl) => {
-    if (user) {
-      const updatedUser = { ...user, profileImage: imageUrl };
-      setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-    }
+  const value = {
+    user,
+    loading,
+    login,
+    logout,
+    register
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateFirstLoginStatus, updateProfileImage }}>
+    <AuthContext.Provider value={value}>
       {!loading && children}
     </AuthContext.Provider>
   );
