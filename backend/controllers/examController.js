@@ -1,167 +1,318 @@
-import Exam from '../models/Exam.js';
-import User from '../models/User.js';
+const Exam = require('../models/Exam');
+const Question = require('../models/Question');
+const Attempt = require('../models/Attempt');
+const Class = require('../models/Class');
+const Student = require('../models/Student');
 
-// @desc    Create new exam record
-// @route   POST /api/exams
-// @access  Private/Admin
-export const createExam = async (req, res) => {
+/**
+ * @desc    Get exams with filters
+ * @route   GET /api/exams
+ */
+const getExams = async (req, res, next) => {
   try {
-    const { studentId, subject, marks, totalMarks, examDate } = req.body;
+    const { classId, term, isPublished, page = 1, limit = 20 } = req.query;
+    const filter = { isActive: true };
+    if (classId) filter.class = classId;
+    if (term) filter.term = term;
+    if (isPublished !== undefined) filter.isPublished = isPublished === 'true';
 
-    // Validation
-    if (!studentId || !subject || marks === undefined || !totalMarks) {
-      return res.status(400).json({ message: 'Please provide all required fields' });
-    }
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
 
-    // Check if student exists
-    const student = await User.findById(studentId);
-    if (!student || student.role !== 'student') {
-      return res.status(404).json({ message: 'Student not found' });
-    }
+    const [exams, total] = await Promise.all([
+      Exam.find(filter)
+        .populate('class', 'className subject grade')
+        .populate('createdBy', 'username')
+        .sort({ scheduledDate: -1, createdAt: -1 })
+        .skip((pageNum - 1) * limitNum)
+        .limit(limitNum)
+        .lean(),
+      Exam.countDocuments(filter)
+    ]);
 
-    // Create exam record
+    // Enrich with question count and attempt count
+    const enriched = await Promise.all(exams.map(async (exam) => {
+      const [questionCount, attemptCount] = await Promise.all([
+        Question.countDocuments({ exam: exam._id }),
+        Attempt.countDocuments({ exam: exam._id })
+      ]);
+      return { ...exam, questionCount, attemptCount };
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: enriched,
+      pagination: { currentPage: pageNum, totalPages: Math.ceil(total / limitNum), totalItems: total }
+    });
+  } catch (error) { next(error); }
+};
+
+/**
+ * @desc    Get single exam with questions
+ * @route   GET /api/exams/:id
+ */
+const getExamById = async (req, res, next) => {
+  try {
+    const exam = await Exam.findById(req.params.id)
+      .populate('class', 'className subject grade')
+      .populate('createdBy', 'username');
+    if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
+
+    const questions = await Question.find({ exam: exam._id }).sort({ questionNumber: 1 }).lean();
+    const attemptCount = await Attempt.countDocuments({ exam: exam._id });
+
+    res.status(200).json({
+      success: true,
+      data: { exam, questions, attemptCount }
+    });
+  } catch (error) { next(error); }
+};
+
+/**
+ * @desc    Create exam
+ * @route   POST /api/exams
+ */
+const createExam = async (req, res, next) => {
+  try {
+    const { classId, title, description, subject, term, paperType, totalMarks, passingMarks, duration, scheduledDate, endDate, startTime, endTime } = req.body;
+
+    const classDoc = await Class.findById(classId);
+    if (!classDoc) return res.status(404).json({ success: false, message: 'Class not found' });
+
     const exam = await Exam.create({
-      studentId,
-      subject,
-      marks,
-      totalMarks,
-      examDate: examDate || Date.now()
+      class: classId,
+      title, description, subject: subject || classDoc.subject,
+      term, paperType, totalMarks, passingMarks, duration,
+      scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+      endDate: endDate ? new Date(endDate) : null,
+      startTime: startTime || '', endTime: endTime || '',
+      createdBy: req.user?._id || null
     });
 
-    const populatedExam = await Exam.findById(exam._id).populate('studentId', 'name email class');
-    res.status(201).json(populatedExam);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: error.message });
-  }
+    res.status(201).json({ success: true, message: 'Exam created', data: exam });
+  } catch (error) { next(error); }
 };
 
-// @desc    Get all exams
-// @route   GET /api/exams
-// @access  Private/Admin
-export const getAllExams = async (req, res) => {
-  try {
-    const exams = await Exam.find().populate('studentId', 'name email class').sort({ examDate: -1 });
-    res.json(exams);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc    Get exams by student ID
-// @route   GET /api/exams/student/:studentId
-// @access  Private
-export const getExamsByStudent = async (req, res) => {
-  try {
-    const studentId = req.params.studentId;
-
-    // If user is a student, they can only view their own exams
-    if (req.user.role === 'student' && req.user._id.toString() !== studentId) {
-      return res.status(403).json({ message: 'You can only view your own exam records' });
-    }
-
-    const exams = await Exam.find({ studentId }).populate('studentId', 'name email class').sort({ examDate: -1 });
-    
-    // Calculate statistics
-    if (exams.length > 0) {
-      const totalMarksObtained = exams.reduce((sum, exam) => sum + exam.marks, 0);
-      const totalMaxMarks = exams.reduce((sum, exam) => sum + exam.totalMarks, 0);
-      const averagePercentage = (totalMarksObtained / totalMaxMarks * 100).toFixed(2);
-      
-      res.json({
-        exams,
-        statistics: {
-          totalExams: exams.length,
-          totalMarksObtained,
-          totalMaxMarks,
-          averagePercentage
-        }
-      });
-    } else {
-      res.json({
-        exams: [],
-        statistics: {
-          totalExams: 0,
-          totalMarksObtained: 0,
-          totalMaxMarks: 0,
-          averagePercentage: 0
-        }
-      });
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc    Get single exam
-// @route   GET /api/exams/:id
-// @access  Private
-export const getExamById = async (req, res) => {
-  try {
-    const exam = await Exam.findById(req.params.id).populate('studentId', 'name email class');
-    
-    if (!exam) {
-      return res.status(404).json({ message: 'Exam record not found' });
-    }
-
-    // If user is a student, they can only view their own exams
-    if (req.user.role === 'student' && req.user._id.toString() !== exam.studentId._id.toString()) {
-      return res.status(403).json({ message: 'You can only view your own exam records' });
-    }
-    
-    res.json(exam);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc    Update exam record
-// @route   PUT /api/exams/:id
-// @access  Private/Admin
-export const updateExam = async (req, res) => {
-  try {
-    const { subject, marks, totalMarks, examDate } = req.body;
-
-    const exam = await Exam.findById(req.params.id);
-
-    if (!exam) {
-      return res.status(404).json({ message: 'Exam record not found' });
-    }
-
-    // Update fields
-    exam.subject = subject || exam.subject;
-    exam.marks = marks !== undefined ? marks : exam.marks;
-    exam.totalMarks = totalMarks || exam.totalMarks;
-    exam.examDate = examDate || exam.examDate;
-
-    const updatedExam = await exam.save();
-    const populatedExam = await Exam.findById(updatedExam._id).populate('studentId', 'name email class');
-    
-    res.json(populatedExam);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc    Delete exam record
-// @route   DELETE /api/exams/:id
-// @access  Private/Admin
-export const deleteExam = async (req, res) => {
+/**
+ * @desc    Update exam
+ * @route   PUT /api/exams/:id
+ */
+const updateExam = async (req, res, next) => {
   try {
     const exam = await Exam.findById(req.params.id);
+    if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
 
-    if (!exam) {
-      return res.status(404).json({ message: 'Exam record not found' });
+    const fields = ['title', 'description', 'subject', 'term', 'paperType', 'totalMarks', 'passingMarks', 'duration', 'scheduledDate', 'endDate', 'startTime', 'endTime'];
+    fields.forEach(f => { if (req.body[f] !== undefined) exam[f] = req.body[f]; });
+
+    await exam.save();
+    res.status(200).json({ success: true, message: 'Exam updated', data: exam });
+  } catch (error) { next(error); }
+};
+
+/**
+ * @desc    Delete exam (soft)
+ * @route   DELETE /api/exams/:id
+ */
+const deleteExam = async (req, res, next) => {
+  try {
+    const exam = await Exam.findById(req.params.id);
+    if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
+
+    const attemptCount = await Attempt.countDocuments({ exam: exam._id });
+    if (attemptCount > 0) {
+      return res.status(400).json({ success: false, message: `Cannot delete exam with ${attemptCount} attempt(s). Archive it instead.` });
     }
 
-    await Exam.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Exam record removed successfully' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: error.message });
-  }
+    exam.isActive = false;
+    await exam.save();
+    res.status(200).json({ success: true, message: 'Exam deleted' });
+  } catch (error) { next(error); }
+};
+
+/**
+ * @desc    Publish/unpublish exam
+ * @route   PUT /api/exams/:id/publish
+ */
+const togglePublish = async (req, res, next) => {
+  try {
+    const exam = await Exam.findById(req.params.id);
+    if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
+
+    if (!exam.isPublished) {
+      const qCount = await Question.countDocuments({ exam: exam._id });
+      if (qCount === 0) return res.status(400).json({ success: false, message: 'Cannot publish exam with no questions' });
+    }
+
+    exam.isPublished = !exam.isPublished;
+    await exam.save();
+    res.status(200).json({ success: true, message: `Exam ${exam.isPublished ? 'published' : 'unpublished'}`, data: exam });
+  } catch (error) { next(error); }
+};
+
+/**
+ * @desc    Publish/unpublish results (teacher controlled)
+ * @route   PUT /api/exams/:id/results
+ */
+const toggleResultsPublish = async (req, res, next) => {
+  try {
+    const exam = await Exam.findById(req.params.id);
+    if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
+
+    exam.resultsPublished = !exam.resultsPublished;
+    exam.resultsPublishedAt = exam.resultsPublished ? new Date() : null;
+    await exam.save();
+    res.status(200).json({ success: true, message: `Results ${exam.resultsPublished ? 'published' : 'hidden'}`, data: exam });
+  } catch (error) { next(error); }
+};
+
+// ─── QUESTIONS ───
+
+/**
+ * @desc    Add question to exam
+ * @route   POST /api/exams/:id/questions
+ */
+const addQuestion = async (req, res, next) => {
+  try {
+    const exam = await Exam.findById(req.params.id);
+    if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
+
+    const existingCount = await Question.countDocuments({ exam: exam._id });
+
+    const { type, content, options, marks, lineCount, explanation } = req.body;
+
+    const question = await Question.create({
+      exam: exam._id,
+      questionNumber: existingCount + 1,
+      type, content, marks,
+      options: type === 'MCQ' ? options : [],
+      lineCount: type === 'WRITTEN' ? (lineCount || 5) : undefined,
+      explanation: explanation || ''
+    });
+
+    res.status(201).json({ success: true, message: 'Question added', data: question });
+  } catch (error) { next(error); }
+};
+
+/**
+ * @desc    Update question
+ * @route   PUT /api/exams/:examId/questions/:questionId
+ */
+const updateQuestion = async (req, res, next) => {
+  try {
+    const question = await Question.findOne({ _id: req.params.questionId, exam: req.params.id });
+    if (!question) return res.status(404).json({ success: false, message: 'Question not found' });
+
+    const fields = ['content', 'options', 'marks', 'lineCount', 'explanation', 'type'];
+    fields.forEach(f => { if (req.body[f] !== undefined) question[f] = req.body[f]; });
+
+    await question.save();
+    res.status(200).json({ success: true, message: 'Question updated', data: question });
+  } catch (error) { next(error); }
+};
+
+/**
+ * @desc    Delete question
+ * @route   DELETE /api/exams/:examId/questions/:questionId
+ */
+const deleteQuestion = async (req, res, next) => {
+  try {
+    const question = await Question.findOneAndDelete({ _id: req.params.questionId, exam: req.params.id });
+    if (!question) return res.status(404).json({ success: false, message: 'Question not found' });
+
+    // Re-number remaining questions
+    const remaining = await Question.find({ exam: req.params.id }).sort({ questionNumber: 1 });
+    for (let i = 0; i < remaining.length; i++) {
+      remaining[i].questionNumber = i + 1;
+      await remaining[i].save();
+    }
+
+    res.status(200).json({ success: true, message: 'Question deleted' });
+  } catch (error) { next(error); }
+};
+
+/**
+ * @desc    Get exam results
+ * @route   GET /api/exams/:id/results
+ */
+const getExamResults = async (req, res, next) => {
+  try {
+    const exam = await Exam.findById(req.params.id).populate('class', 'className subject grade');
+    if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
+
+    const attempts = await Attempt.find({ exam: exam._id })
+      .populate('student', 'name email grade')
+      .sort({ finalScore: -1 })
+      .lean();
+
+    const stats = {
+      totalAttempts: attempts.length,
+      graded: attempts.filter(a => a.status === 'GRADED' || a.status === 'REVIEWED').length,
+      averageScore: 0,
+      highestScore: 0,
+      lowestScore: 0,
+      passCount: 0
+    };
+
+    const gradedAttempts = attempts.filter(a => a.finalScore != null);
+    if (gradedAttempts.length > 0) {
+      const scores = gradedAttempts.map(a => a.finalScore);
+      stats.averageScore = Math.round(scores.reduce((s, v) => s + v, 0) / scores.length * 10) / 10;
+      stats.highestScore = Math.max(...scores);
+      stats.lowestScore = Math.min(...scores);
+      stats.passCount = gradedAttempts.filter(a => Number(a.finalScore) >= Number(exam.passingMarks || 0)).length;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { exam, attempts, stats }
+    });
+  } catch (error) { next(error); }
+};
+
+/**
+ * @desc    Get student marks for all exams in a class
+ * @route   GET /api/exams/class/:classId/student-marks
+ * @access  Private (Student)
+ */
+const getStudentMarks = async (req, res, next) => {
+  try {
+    const student = await Student.findOne({ email: req.user.email });
+    if (!student) return res.status(404).json({ success: false, message: 'Student profile not found' });
+
+    const exams = await Exam.find({ class: req.params.classId, isActive: true, isPublished: true })
+      .sort({ scheduledDate: -1 })
+      .lean();
+
+    const marksData = await Promise.all(
+      exams.map(async (exam) => {
+        const attempt = await Attempt.findOne({ exam: exam._id, student: student._id }).lean();
+        return {
+          _id: exam._id,
+          title: exam.title,
+          term: exam.term,
+          totalMarks: exam.totalMarks,
+          passingMarks: exam.passingMarks,
+          scheduledDate: exam.scheduledDate,
+          resultsPublished: exam.resultsPublished,
+          attempt: attempt ? {
+            status: attempt.status,
+            autoScore: attempt.autoScore,
+            manualScore: attempt.manualScore,
+            finalScore: attempt.finalScore,
+            submittedAt: attempt.submittedAt
+          } : null
+        };
+      })
+    );
+
+    res.status(200).json({ success: true, data: marksData });
+  } catch (error) { next(error); }
+};
+
+module.exports = {
+  getExams, getExamById, createExam, updateExam, deleteExam,
+  togglePublish, toggleResultsPublish,
+  addQuestion, updateQuestion, deleteQuestion,
+  getExamResults, getStudentMarks
 };
