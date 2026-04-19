@@ -18,43 +18,27 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Function to softly load routes and handle both ES modules and CommonJS
-const fs = require('fs');
-const loadRoute = (apiPath, routePath) => {
-  try {
-    const fullPath = path.join(__dirname, routePath + '.js');
-    if (fs.existsSync(fullPath)) {
-      const router = require(routePath);
-      app.use(apiPath, router.default || router);
-    } else {
-      console.warn(`Warning: Route file not found: ${routePath}`);
-    }
-  } catch (error) {
-    console.error(`Error loading route ${routePath}:`, error.message);
-  }
-};
-
 // Routes
-loadRoute('/api/auth', './routes/authRoutes');
-loadRoute('/api/users', './routes/userRoutes');
-loadRoute('/api/classes', './routes/classRoutes');
-loadRoute('/api/teachers', './routes/teacherRoutes');
-loadRoute('/api/students', './routes/studentRoutes');
-loadRoute('/api/halls', './routes/hallRoutes');
-loadRoute('/api/enrollments', './routes/enrollmentRoutes');
-loadRoute('/api/payments', './routes/paymentRoutes');
-loadRoute('/api/settings', './routes/settingsRoutes');
-loadRoute('/api/attendance', './routes/attendanceRoutes');
-loadRoute('/api/exams', './routes/examRoutes');
-loadRoute('/api/paper-panel', './routes/paperPanelRoutes');
-loadRoute('/api/materials', './routes/materialRoutes');
-loadRoute('/api/announcements', './routes/announcementRoutes');
-loadRoute('/api/notifications', './routes/notificationRoutes');
-loadRoute('/api/service-requests', './routes/serviceRequestRoutes');
-loadRoute('/api/dashboard', './routes/dashboardRoutes');
-loadRoute('/api/revenue', './routes/revenueRoutes');
-loadRoute('/api/profile', './routes/profileRoutes');
-loadRoute('/api/teacher-attendance', './routes/teacherAttendanceRoutes');
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/classes', require('./routes/classRoutes'));
+app.use('/api/teachers', require('./routes/teacherRoutes'));
+app.use('/api/students', require('./routes/studentRoutes'));
+app.use('/api/halls', require('./routes/hallRoutes'));
+app.use('/api/enrollments', require('./routes/enrollmentRoutes'));
+app.use('/api/payments', require('./routes/paymentRoutes'));
+app.use('/api/settings', require('./routes/settingsRoutes'));
+app.use('/api/attendance', require('./routes/attendanceRoutes'));
+app.use('/api/exams', require('./routes/examRoutes'));
+app.use('/api/paper-panel', require('./routes/paperPanelRoutes'));
+app.use('/api/materials', require('./routes/materialRoutes'));
+app.use('/api/announcements', require('./routes/announcementRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/service-requests', require('./routes/serviceRequestRoutes'));
+app.use('/api/dashboard', require('./routes/dashboardRoutes'));
+app.use('/api/revenue', require('./routes/revenueRoutes'));
+app.use('/api/profile', require('./routes/profileRoutes'));
+app.use('/api/teacher-attendance', require('./routes/teacherAttendanceRoutes'));
 
 // Health check route
 app.get('/api/health', (req, res) => {
